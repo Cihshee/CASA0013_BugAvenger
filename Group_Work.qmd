@@ -109,6 +109,11 @@ A parenthetical citation example: There are many ways to research Airbnb [see, f
 ## 2. Why did they collect the InsideAirbnb data?
 
 ::: {.duedate}
+As a privately-owned company, there is currently no mechanism for holding Airbnb accountable for its own actions and the public’s ability to see the truth
+behind Airbnb’s selected data releases is limited. Airbnb’s so-called transparency initiatives are no substitute for genuine audits or for genuine accountability.
+Thus, this organization believes in monitoring and analyzing airbnb's regularly posteddatasets to show the public that majority of Airbnb listings in most cities are entire homes, many of which are rented all year round - disrupting housing and communities.
+
+##Reference 
 
 ( 4 points; Answer due Week 7 )
 
