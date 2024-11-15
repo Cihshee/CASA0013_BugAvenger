@@ -94,6 +94,10 @@ else:
 
 ::: {.duedate}
 
+Collaborators:
+Murray Cox, John Morris, Taylor Higgins
+Past Collaborators:
+Alice Corona, Luca Lamonaca, Michael "Ziggy" Mintz, Anya Sophe Behn
 ( 2 points; Answer due Week 7 )
 
 :::
