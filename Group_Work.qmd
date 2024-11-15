@@ -93,7 +93,7 @@ else:
 ## 1. Who collected the InsideAirbnb data?
 
 ::: {.duedate}
-
+@Insideairbnb: https://insideairbnb.com/about/
 Collaborators:
 Murray Cox, John Morris, Taylor Higgins
 Past Collaborators:
