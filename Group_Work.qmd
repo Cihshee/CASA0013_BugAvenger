@@ -138,6 +138,12 @@ ax.set_xlim([0,500]);
 ::: {.duedate}
 
 ( 5 points; Answer due Week 8 )
+The data sets of @Insideairbnb were assembled by programmatically compiling public information from  Airbnb’s website, but they were implemented and collected independently. Both data sets attempt to locate all the listings within a city, and then visit the page for each listing to collect listing data, including the host ID. The host ID allows an analysis of the number of listings posted by a single host. 
+For estimating how often an Airbnb listing is being rented out, and also approximating a listing's income, @Insideairbnb used an occupancy model. They christened the occupancy model as "San Francisco Model", in honor of the public policy and urban planners working for that fair city who created occupancy models to quantify the impact of Airbnb on housing.
+
+## Reference 
+# Cox, M., and T. Slee. 2016. “How Airbnb’s Data Hid the Facts in New York City.” Inside Airbnb. http://insideairbnb.com/reports/how-airbnbs-data-hid-the-facts-in-new-york-city.pdf
+# https://insideairbnb.com/data-assumptions/ 
 
 :::
 
