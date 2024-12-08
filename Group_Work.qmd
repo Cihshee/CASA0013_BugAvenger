@@ -67,44 +67,455 @@ Are there any areas on which you would appreciate more detailed feedback if we'r
 
 {{< pagebreak >}}
 
-# Response to Questions
 
-See the raw file for examples of how to hide computational output as there is code hidden here.
 
 ```{python}
-#| echo: False
-import os
+# Reproducible Code
+# Install and import packages
+
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import geopandas as gpd
+from nltk.tokenize import word_tokenize 
+from nltk.corpus import stopwords 
+from gensim import corpora,models,similarities 
+from geopy.distance import geodesic 
+from shapely import wkt 
+import os
 ```
 
 ```{python}
-#| echo: False
-host = 'https://orca.casa.ucl.ac.uk'
-path = '~jreades/data'
-file = '20240614-London-listings.parquet'
+# Read Inside Airbnb data
 
-if os.path.exists(file):
-  df = pd.read_parquet(file)
-else: 
-  df = pd.read_parquet(f'{host}/{path}/{file}')
-  df.to_parquet(file)
+cols = ['id', 'name', 'description', 'neighborhood_overview', 'host_id','neighbourhood_cleansed', 
+        'latitude','longitude', 'room_type', 'price', 'minimum_nights_avg_ntm', 
+        'maximum_nights_avg_ntm', 'availability_30','number_of_reviews', 'review_scores_rating', 
+        'review_scores_accuracy','calculated_host_listings_count', 'reviews_per_month']
+
+# Read the listing.csv.gz compressed file through the URL
+df = pd.read_csv('https://github.com/Cihshee/CASA0013_BugAvenger/raw/refs/heads/main/data/listings.csv.gz', encoding='latin1', low_memory=False, usecols=cols)
+
+# Print the dimensions of the loaded DataFrame
+print(f"Data frame is {df.shape[0]:,} x {df.shape[1]}")
 ```
+
+```{python}
+# Calculate the total number of missing values for each column
+# Sort the results in descending order to see columns with the most missing values first
+df.isnull().sum(axis=0).sort_values(ascending=False)
+```
+
+```{python}
+# Drop rows where the 'id' column has missing (NaN) values
+# 'inplace=True' applies the change directly to the DataFrame
+df.drop(df[df.id.isna()].index.values, axis=0, inplace=True)
+```
+
+```{python}
+# Next, we check for rows that still have lots of NaN.
+# From following output, we find several rows have 6 NaNs. By checking, we found that these rows also lost a lot of important information that may be used in subsequent analysis (such as "latitude", "longitude", "host_id").
+# Therefore, these rows which lost much important information are also needed to be deleted.
+df.isnull().sum(axis=1).sort_values(ascending=False)
+```
+
+```{python}
+# Filter rows where the 'longitude' and 'latitude' column can be converted to a numeric value
+# 'errors="coerce"' replaces invalid parsing with NaN, and 'notna()' keeps only valid rows
+df = df[pd.to_numeric(df['longitude'], errors='coerce').notna()]
+df = df[pd.to_numeric(df['latitude'], errors='coerce').notna()]
+
+df.drop(df[df.longitude.isna()].index.values, axis=0, inplace=True)
+df.drop(df[df.latitude.isna()].index.values, axis=0, inplace=True)
+
+df.drop(df[df.neighborhood_overview.isna() & df.description.isna()].index.values, axis=0, inplace=True)
+
+# Print the number of rows remaining in the DataFrame after all filtering
+# print(df.shape[0])
+```        
+
+```{python}
+# Remove "$" symbol and try to convert to float number
+df['price'] = df['price'].str.replace('$','').str.strip()
+df['price'] = pd.to_numeric(df['price'], errors='coerce')
+
+df['maximum_nights_avg_ntm'] = pd.to_numeric(df['maximum_nights_avg_ntm'], errors='coerce') 
+df['minimum_nights_avg_ntm'] = pd.to_numeric(df['minimum_nights_avg_ntm'], errors='coerce')
+df['reviews_per_month'] = pd.to_numeric(df['reviews_per_month'], errors='coerce') 
+df['calculated_host_listings_count'] = pd.to_numeric(df['calculated_host_listings_count'], errors='coerce') 
+df['availability_30'] = pd.to_numeric(df['availability_30'], errors='coerce') 
+df['number_of_reviews'] = pd.to_numeric(df['number_of_reviews'], errors='coerce') 
+df['review_scores_rating'] = pd.to_numeric(df['review_scores_rating'], errors='coerce') 
+df['review_scores_accuracy'] = pd.to_numeric(df['review_scores_accuracy'], errors='coerce') 
+df['review_scores_accuracy'] = pd.to_numeric(df['review_scores_accuracy'], errors='coerce') 
+
+# Filter rows by room type
+# Choose specify columns to include
+houseList = df.loc[df["room_type"].isin(["Entire home/apt","Private room","Shared room"]),["id","host_id","room_type","description","neighborhood_overview","longitude","latitude","calculated_host_listings_count","neighbourhood_cleansed"]]
+
+print(houseList.shape[0])
+
+```
+
+
+```{python}
+# Group the 'houseList' DataFrame by the 'neighbourhood_cleansed' column
+# For each neighborhood group, count the occurrences of each 'room_type'
+houseList.groupby('neighbourhood_cleansed')['room_type'].value_counts()
+```
+
+
+```{python}
+# Check for duplicate values in the 'id' column
+duplicate_count = df['id'].duplicated(keep=False).sum()
+print(f"the count of duplicate id: {duplicate_count}")
+```
+
+```{python}
+# Define sgensimSimilarities() and gensimilarities()
+
+# read London spatial stopwords
+with open('data/London_Spatial_Stopwords_list_1126.CSV', 'r') as f:
+    stopWords_london = set(f.read().split())
+
+# Get a collection of common English words("the", "is", "and", etc.), which will be excluded from the similarity calculation
+stopWords = set(stopwords.words('english')) 
+stopWords = stopWords | stopWords_london 
+
+# Check the stopwords_list
+print(stopWords_london)
+print(stopWords)
+```
+
+
+```{python}
+def gensimSimilarities(test, textList):
+    """
+    if textList only contain one element, we take turns to use the two text as test
+    """
+    if len(textList)==1: 
+        sim = [max(gensimilarities(test, textList))] 
+        textList.append(test) 
+        test = textList.pop(0)
+        sim.append(max(gensimilarities(test, textList))) 
+        # use the small one as the similarity
+        sim = min(sim) 
+    else:
+        sim = max(gensimilarities(test, textList))
+    return sim
+```
+
+
+```{python}
+def gensimilarities(test,textList):
+    """
+    use tf-idf to construst the importance of the words, and use the gensim to calculate the similarity
+    """
+    allWordsList = []
+    # when there are only one element, the function will always return 0
+    if len(textList)==1:
+        textList.append("0") 
+    for text in textList:
+        # separate the words and exclude the words in stopwords
+        wordsList = [word for word in word_tokenize(text) if word not in stopWords]
+        allWordsList.append(wordsList)
+    dictionary = corpora.Dictionary(allWordsList)
+    corpus = [dictionary.doc2bow(wordsList1) for wordsList1 in allWordsList]    
+    # Convert the test text into BOW format and filter for disused words
+    testWords = dictionary.doc2bow([word for word in word_tokenize(test) if word not in stopWords])
+    # Build TF-IDF models and similarity indexes
+    tfidf = models.TfidfModel(corpus)
+    index = similarities.SparseMatrixSimilarity(tfidf[corpus], num_features=len(dictionary.keys()))
+    sim = index[tfidf[testWords]]
+    return sim
+```
+
+```{python}
+# Define checkDescription() that determines if a room description or neighborhood information is highly similar to the description of a set of landlord listings
+# If the similarity exceeds a threshold (0.5), the room is categorized as ghost hotel
+
+def checkDescription(checkroom,ghostHotel):
+    """
+    Define checkDescription() that determines if a room description or neighborhood information is highly similar to the description of a set of landlord listings
+    
+    If the similarity exceeds a threshold (0.5), the room is categorized as ghost hotel
+    """
+    checkDf = houseList.loc[houseList["id"]==checkroom,["id", "neighborhood_overview","description"]]
+    samehostDf = houseList[houseList["id"].isin(ghostHotel)]
+    simlarity1 = 0
+    simlarity2 = 0
+    overviewDf = samehostDf["neighborhood_overview"].dropna()
+    checkOverview = checkDf["neighborhood_overview"].dropna()
+
+    if overviewDf.shape[0]>0 and checkOverview.shape[0] > 0:
+        simlarity1 = gensimSimilarities(checkOverview.iloc[0],list(overviewDf)) 
+
+    if samehostDf.shape[0] != overviewDf.shape[0]: 
+        descripDf = samehostDf["description"].dropna()
+        checkDesc = checkDf["description"].dropna()
+        if descripDf.shape[0]>0 and checkDesc.shape[0] > 0: 
+            simlarity2 = gensimSimilarities(checkDesc.iloc[0], list(descripDf)) 
+    simlarity = max(simlarity1, simlarity2)
+
+    # If the similarity exceeds a threshold (0.5), the room is categorized as ghost hotel
+    if simlarity > 0.5:
+        return True
+    else:
+        return False
+```
+
+```{python}
+# Define mergeSubList()
+
+def mergeSubList(initiallist):
+    """
+    If there are same id in different sublist, merge the sublist
+    """
+    length = len(initiallist)
+    for init1 in range(length):
+        for init2 in range(init1 + 1, length):
+            if initiallist[init1] == [0]:
+                break
+            if initiallist[init2] == [0]:
+                continue
+
+            # to see whether the two sublists have same elements
+            x = list(set(initiallist[init1]+initiallist[init2]))
+            y = len(initiallist[init1]) + len(initiallist[init2])           
+            
+            # If the merged length is less, there is a duplicate
+            if len(x) < y:
+                initiallist[init2] = [0]
+                initiallist[init1] = x
+    return initiallist
+```
+
+```{python}
+# The main part to find the ghost hotels
+
+# Creat a list called "ghostlist" which contains all the 'id' for ghost rooms, and each sublist of ghostlist is a "ghost hotel".
+
+# - Initialize data and temporary rows
+# - Iterate through listings:
+#    - Filter a subset of listings by host
+#    - Skip if the host has <= 1 listing
+#    - Group by geographic location
+#    - Group by text description
+#    - Merge groups and retain valid groups
+# - Update results (ghostList) and unprocessed listing indices
+# - Remove temporary rows and clean the data
+
+# A listing must meet the following criteria to be classified as a "ghost hotel":
+
+# - Geographical condition: Distance is less than 200 meters.
+# - Description condition: Text descriptions are similar.
+
+indexlist = list(houseList.index)
+ghostList = []
+
+houseList.loc["ini",["id","host_id","description","neighborhood_overview","longitude","latitude","calculated_host_listings_count"]] = [0,0,"0","0",0,0,0]
+while len(indexlist) > 0 :
+    # if one have more than one private or shared rooms on Airbnb, it has the suspicion to be ghost hotels
+    if houseList.loc[indexlist[0],"calculated_host_listings_count"] > 1:
+        # find the house which have the same host_id and put them together
+        ghostdf = houseList[houseList["host_id"] == houseList.loc[indexlist[0],"host_id"]]
+        ghostHost = list(ghostdf['id'])
+        # it is a list used to store the ghost hotels list
+        initiallist = [[0]]
+        for i in ghostdf.index:
+            # if there are no rooms within the distance it will still be False
+            isghost = False
+            for init in initiallist:
+                for ini in init:
+                    # the longitude and latitude of the rooms in list
+                    iniLogLat = (houseList.loc[houseList["id"]==ini,"longitude"].iloc[0],houseList.loc[houseList["id"]==ini,"latitude"].iloc[0])
+                    iLonLat = (ghostdf.loc[i,"longitude"],ghostdf.loc[i,"latitude"])
+                    # use the longitude and latitude to calculate the distance
+                    distance = geodesic(iniLogLat, iLonLat).m
+                    # if the distance is less than 200m, we consider it as ghost hotel
+                    #(distance of 50 to 500 meters is manually tried and find the optimal one)
+                    if distance < 200:
+                        init.append(ghostdf.loc[i,"id"])
+                        isghost = True
+                        break
+            if not isghost:
+                initiallist.append([ghostdf.loc[i,"id"]])
+        
+        # use the description to calculate the distance, in case of inaccurate positioning
+        initiallist1 = [[0]]
+        for checkroom in ghostHost:
+            isghost = False
+            for ghostHotel in initiallist1:
+                if checkDescription(checkroom,ghostHotel): 
+                    ghostHotel.append(checkroom)
+                    isghost = True
+                    break
+            if not isghost:
+                initiallist1.append([checkroom])
+        initiallist.extend(initiallist1)
+        initiallist = mergeSubList(initiallist)
+        # the list with more than one id is a ghost hotel
+        initiallist = [init for init in initiallist if len(init)>1]
+        ghostList.extend(initiallist)
+        # delete the rows that we have already checked
+        indexlist = [index for index in indexlist if index not in ghostdf.index]
+
+    else:
+        # if the host don't have more than one private or shared rooms, it is not ghost hotels
+        del indexlist[0]
+        
+houseList.drop("ini",inplace=True)
+```
+
+```{python}
+ghostHotelDf = pd.DataFrame(columns = df.columns) 
+
+for rooms in ghostList:
+    # Using id, find the corresponding complete information in the original dataframe df and summarize it in the new dataframe ghostHotelDf
+    ghostHotelDf = ghostHotelDf._append(df.loc[df["id"].isin(rooms)])
+
+print(ghostHotelDf.shape[0]) # 49848
+
+```
+
+```{python}
+ghostHotelDf.head()
+
+room_type_counts = ghostHotelDf['room_type'].value_counts()
+print(room_type_counts)
+
+# Entire home/apt    32952
+# Private room       16709
+# Shared room          187
+```
+
+```{python}
+# Processing ghostHotelDf
+# We checked the resulting ghostHotelDf and found that there are "id" duplicates in it, so we need to remove the duplicate "id" row.
+
+value_counts_id_0 = ghostHotelDf['id'].value_counts()
+print(value_counts_id_0[:10])
+
+ghostHotelDf_unique = ghostHotelDf[~ghostHotelDf['id'].duplicated(keep='first')]
+
+value_counts_id_1 = ghostHotelDf_unique['id'].value_counts()
+print(value_counts_id_1[:10])
+
+print(f"Data frame is {ghostHotelDf_unique.shape[0]:,} x {ghostHotelDf_unique.shape[1]}")
+```
+
+```{python}
+# It was found that some owners have multiple listings (possibly be agents), and based on the visualization results, we need to remove the data with a number of listings > 7
+
+# Check host_id with multiple listings
+value_counts_host_id_0 = ghostHotelDf_unique['host_id'].value_counts()
+print(value_counts_host_id_0[:10])
+
+# Check how many listings each landlord owns Number of appearances
+frequency_counts = value_counts_host_id_0.value_counts()
+sorted_frequency_counts = frequency_counts.sort_index()
+#print(sorted_frequency_counts[:50])
+print(sorted_frequency_counts)
+
+# plot figure
+plt.figure(figsize=(10, 6))
+sns.histplot(value_counts_host_id_0, bins=15, kde=True)
+plt.title("Host ID Occurrence Frequency Distribution")
+plt.xlabel("Number of Occurrences")
+plt.ylabel("Frequency")
+plt.xlim(0, 20)
+plt.show()
+
+plt.figure(figsize=(10, 6))
+sns.boxplot(x=value_counts_host_id_0)
+plt.title("Boxplot of Host ID Occurrences")
+plt.xlabel("Number of Occurrences")
+plt.xlim(0, 20)
+plt.show()
+```
+
+```{python}
+# The line chart shows a sharp decline in frequency beyond 7, indicating a significant drop in the number of hosts with more listings.
+# Using 7 as the threshold balances capturing a manageable group of active hosts while excluding extreme cases for focused analysis.
+
+hosts_to_remove = ghostHotelDf_unique.loc[ghostHotelDf_unique['calculated_host_listings_count'] > 7, 'host_id'].unique()
+
+ghostHotelDf_filtered = ghostHotelDf_unique[~ghostHotelDf_unique['host_id'].isin(hosts_to_remove)]
+
+print(f"Original DataFrame Shape: {ghostHotelDf_unique.shape}")
+print(f"Filtered DataFrame Shape: {ghostHotelDf_filtered.shape}")
+
+print("Host IDs removed:", hosts_to_remove)
+```
+
+```{python}
+# Visualization
+# Composition of airbnb listings with respect yo ghost hotel
+
+number1Df = pd.DataFrame(df["neighbourhood_cleansed"].value_counts()) # 按区域统计房源数
+number2Df = pd.DataFrame(houseList["neighbourhood_cleansed"].value_counts()) # 按区域统计私人房源和共享房源数量
+number3Df = pd.DataFrame(ghostHotelDf_filtered["neighbourhood_cleansed"].value_counts()) # 按区域统计“ghost hotel”房源数
+numberDf = pd.merge(number1Df, number2Df, how='outer',left_index=True,right_index=True)
+numberDf = pd.merge(numberDf, number3Df, how='outer',left_index=True,right_index=True) # 合并三个统计结果
+numberDf.columns = ["total listings","private/shared rooms","ghost hotels"] # 命名列
+numberDf = numberDf.fillna(0) # 将 NaN 值填补为 0
+
+numberDf.head()
+```
+
+```{python}
+def stackFigure():
+    sns.set_style("white")
+    sns.set_context({"figure.figsize": (18, 10)})
+    sns.barplot(x = numberDf.index, y = numberDf["total listings"], color = "yellow")
+    sns.barplot(x = numberDf.index, y = numberDf["private/shared rooms"], color = "blue")
+    ghost_plot = sns.barplot(x = numberDf.index, y = numberDf["ghost hotels"], color = "red")
+
+    raw_data_legend = plt.Rectangle((0,0),1,1,fc="yellow", edgecolor = 'none')
+    private_room_legend = plt.Rectangle((0,0),2,1,fc='blue',  edgecolor = 'none')
+    ghost_hotel_legend = plt.Rectangle((0,0),1,1,fc='red',  edgecolor = 'none')
+    font = {'weight' : 'normal','size': 20}
+    l = plt.legend([raw_data_legend, private_room_legend, ghost_hotel_legend], ["total listings", "private/shared rooms","ghost hotel rooms"], ncol = 1, prop={'size':16},loc='upper left')
+    ghost_plot.set_ylabel("The Amount of Rooms",font)
+    ghost_plot.set_title("Figure 1: The Composition of Listings on Airbnb of 33 Boroughs in London",fontsize=25)
+    plt.yticks(fontsize= 10)
+    plt.xticks(rotation=-90, fontsize=14)
+    plt.show()
+```
+
+
+
+【此处需要插入可视化部分的所有代码】
+
+
+
+
+
+
+
+
+
+# Response to Questions
 
 ## 1. Who collected the InsideAirbnb data?
 
 ::: {.duedate}
+( 2 points; Answer due Week 7 )
+:::
+
 @Insideairbnb: https://insideairbnb.com/about/
 Collaborators:
 Murray Cox, John Morris, Taylor Higgins
 Past Collaborators:
 Alice Corona, Luca Lamonaca, Michael "Ziggy" Mintz, Anya Sophe Behn
-( 2 points; Answer due Week 7 )
 
-:::
+
 
 An inline citation example: As discussed on @insideairbnb, there are many...
 
 A parenthetical citation example: There are many ways to research Airbnb [see, for example, @insideairbnb]... 
+
 
 ## 2. Why did they collect the InsideAirbnb data?
 
@@ -141,9 +552,9 @@ ax.set_xlim([0,500]);
 The data sets of @Insideairbnb were assembled by programmatically compiling public information from  Airbnb’s website, but they were implemented and collected independently. Both data sets attempt to locate all the listings within a city, and then visit the page for each listing to collect listing data, including the host ID. The host ID allows an analysis of the number of listings posted by a single host. 
 For estimating how often an Airbnb listing is being rented out, and also approximating a listing's income, @Insideairbnb used an occupancy model. They christened the occupancy model as "San Francisco Model", in honor of the public policy and urban planners working for that fair city who created occupancy models to quantify the impact of Airbnb on housing.
 
-## Reference 
-# Cox, M., and T. Slee. 2016. “How Airbnb’s Data Hid the Facts in New York City.” Inside Airbnb. http://insideairbnb.com/reports/how-airbnbs-data-hid-the-facts-in-new-york-city.pdf
-# https://insideairbnb.com/data-assumptions/ 
+- Reference 
+    - Cox, M., and T. Slee. 2016. “How Airbnb’s Data Hid the Facts in New York City.” Inside Airbnb. http://insideairbnb.com/reports/how-airbnbs-data-hid-the-facts-in-new-york-city.pdf
+    - https://insideairbnb.com/data-assumptions/ 
 
 :::
 
@@ -188,3 +599,4 @@ Your QMD file should automatically download your BibTeX and CLS files and any ot
 Written in Markdown and generated from [Quarto](https://quarto.org/). Fonts used: [Spectral](https://fonts.google.com/specimen/Spectral) (mainfont), [Roboto](https://fonts.google.com/specimen/Roboto) (<span style="font-family:Sans-Serif;">sansfont</span>) and [JetBrains Mono](https://fonts.google.com/specimen/JetBrains%20Mono) (`monofont`). 
 
 ## References
+
