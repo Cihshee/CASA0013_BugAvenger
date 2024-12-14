@@ -90,9 +90,9 @@ import os
 # Read Inside Airbnb data
 
 cols = ['id', 'name', 'description', 'neighborhood_overview', 'host_id','neighbourhood_cleansed', 
-        'latitude','longitude', 'room_type', 'price', 'minimum_nights_avg_ntm', 
-        'maximum_nights_avg_ntm', 'availability_30','number_of_reviews', 'review_scores_rating', 
-        'review_scores_accuracy','calculated_host_listings_count', 'reviews_per_month']
+        'latitude','longitude', 'room_type', 'price', 'minimum_nights_avg_ntm', 
+        'maximum_nights_avg_ntm', 'availability_30','availability_90','availability_365','number_of_reviews', 'review_scores_rating', 
+        'review_scores_accuracy','calculated_host_listings_count', 'reviews_per_month']
 
 # Read the listing.csv.gz compressed file through the URL
 df = pd.read_csv('https://github.com/Cihshee/CASA0013_BugAvenger/raw/refs/heads/main/data/listings.csv.gz', encoding='latin1', low_memory=False, usecols=cols)
@@ -145,6 +145,8 @@ df['minimum_nights_avg_ntm'] = pd.to_numeric(df['minimum_nights_avg_ntm'], error
 df['reviews_per_month'] = pd.to_numeric(df['reviews_per_month'], errors='coerce') 
 df['calculated_host_listings_count'] = pd.to_numeric(df['calculated_host_listings_count'], errors='coerce') 
 df['availability_30'] = pd.to_numeric(df['availability_30'], errors='coerce') 
+df['availability_90'] = pd.to_numeric(df['availability_90'], errors='coerce') 
+df['availability_365'] = pd.to_numeric(df['availability_365'], errors='coerce') 
 df['number_of_reviews'] = pd.to_numeric(df['number_of_reviews'], errors='coerce') 
 df['review_scores_rating'] = pd.to_numeric(df['review_scores_rating'], errors='coerce') 
 df['review_scores_accuracy'] = pd.to_numeric(df['review_scores_accuracy'], errors='coerce') 
@@ -459,15 +461,16 @@ print(f"Data frame is {ghostHotelDf_unique.shape[0]:,} x {ghostHotelDf_unique.sh
 
 ```{python}
 # Visualization
-# Composition of airbnb listings with respect yo ghost hotel
 
-number1Df = pd.DataFrame(df["neighbourhood_cleansed"].value_counts()) # 按区域统计房源数
-number2Df = pd.DataFrame(houseList["neighbourhood_cleansed"].value_counts()) # 按区域统计私人房源和共享房源数量
-number3Df = pd.DataFrame(ghostHotelDf_filtered["neighbourhood_cleansed"].value_counts()) # 按区域统计“ghost hotel”房源数
+# Composition of airbnb listings with respect ghost hotel
+
+number1Df = pd.DataFrame(df["neighbourhood_cleansed"].value_counts())
+number2Df = pd.DataFrame(ghostHotelDf_unique["neighbourhood_cleansed"].value_counts())
+# number3Df = pd.DataFrame(houseList["neighbourhood_cleansed"].value_counts())
 numberDf = pd.merge(number1Df, number2Df, how='outer',left_index=True,right_index=True)
-numberDf = pd.merge(numberDf, number3Df, how='outer',left_index=True,right_index=True) # 合并三个统计结果
-numberDf.columns = ["total listings","private/shared rooms","ghost hotels"] # 命名列
-numberDf = numberDf.fillna(0) # 将 NaN 值填补为 0
+# numberDf = pd.merge(numberDf, number3Df, how='outer',left_index=True,right_index=True)
+numberDf.columns = ["total listings","private/shared rooms","ghost hotels"] 
+numberDf = numberDf.fillna(0)
 
 numberDf.head()
 ```
@@ -479,7 +482,6 @@ def stackFigure():
     sns.barplot(x = numberDf.index, y = numberDf["total listings"], color = "yellow")
     # sns.barplot(x = numberDf.index, y = numberDf["private/shared rooms"], color = "blue")
     ghost_plot = sns.barplot(x = numberDf.index, y = numberDf["ghost hotels"], color = "red")
-
     raw_data_legend = plt.Rectangle((0,0),1,1,fc="yellow", edgecolor = 'none')
     # private_room_legend = plt.Rectangle((0,0),2,1,fc='blue',  edgecolor = 'none')
     ghost_hotel_legend = plt.Rectangle((0,0),1,1,fc='red',  edgecolor = 'none')
@@ -515,16 +517,8 @@ def stackFigure():
 
 @Insideairbnb: https://insideairbnb.com/about/
 
-Collaborators:
-Murray Cox, John Morris, Taylor Higgins
-Past Collaborators:
-Alice Corona, Luca Lamonaca, Michael "Ziggy" Mintz, Anya Sophe Behn
-
-
-
-An inline citation example: As discussed on @insideairbnb, there are many...
-
-A parenthetical citation example: There are many ways to research Airbnb [see, for example, @insideairbnb]... 
+Collaborators: Murray Cox, John Morris, Taylor Higgins
+Past collaborators: Alice Corona, Luca Lamonaca, Michael "Ziggy" Mintz, Anya Sophe Behn
 
 
 ## 2. Why did they collect the InsideAirbnb data?
@@ -550,8 +544,8 @@ print(f"One of way to embed output in the text looks like this: after cleaning, 
 This way is also supposed to work (`{python} f"{df.shape[0]:,}" `) but I've found it less reliable.
 
 ```{python}
-ax = df.host_listings_count.plot.hist(bins=50);
-ax.set_xlim([0,500]);
+ax = df.host_listings_count.plot.hist(bins=50)
+ax.set_xlim([0,500])
 ```
 
 ## 3. How did they collect it?
