@@ -175,9 +175,15 @@ print(f"the count of duplicate id: {duplicate_count}")
 ```{python}
 # Define sgensimSimilarities() and gensimilarities()
 
-# read London spatial stopwords
-with open('data/London_Spatial_Stopwords_list_1126.CSV', 'r') as f:
-    stopWords_london = set(f.read().split())
+# nltk.download('stopwords')
+# nltk.download('punkt')
+# nltk.download('punkt_tab')
+
+import requests
+
+response = requests.get('https://raw.githubusercontent.com/Cihshee/CASA0013_BugAvenger/main/data/London_Spatial_Stopwords_list_1126.CSV')
+response.raise_for_status()  # Check if the request was successful
+stopWords_london = set(response.text.split())  # Split the text content into a set of words
 
 # Get a collection of common English words("the", "is", "and", etc.), which will be excluded from the similarity calculation
 stopWords = set(stopwords.words('english')) 
@@ -403,50 +409,52 @@ value_counts_id_1 = ghostHotelDf_unique['id'].value_counts()
 print(value_counts_id_1[:10])
 
 print(f"Data frame is {ghostHotelDf_unique.shape[0]:,} x {ghostHotelDf_unique.shape[1]}")
+
+# ghostHotelDf_unique: removed duplicates
 ```
 
 ```{python}
-# It was found that some owners have multiple listings (possibly be agents), and based on the visualization results, we need to remove the data with a number of listings > 7
+# # It was found that some owners have multiple listings (possibly be agents), and based on the visualization results, we need to remove the data with a number of listings > 7
 
-# Check host_id with multiple listings
-value_counts_host_id_0 = ghostHotelDf_unique['host_id'].value_counts()
-print(value_counts_host_id_0[:10])
+# # Check host_id with multiple listings
+# value_counts_host_id_0 = ghostHotelDf_unique['host_id'].value_counts()
+# print(value_counts_host_id_0[:10])
 
-# Check how many listings each landlord owns Number of appearances
-frequency_counts = value_counts_host_id_0.value_counts()
-sorted_frequency_counts = frequency_counts.sort_index()
-#print(sorted_frequency_counts[:50])
-print(sorted_frequency_counts)
+# # Check how many listings each landlord owns Number of appearances
+# frequency_counts = value_counts_host_id_0.value_counts()
+# sorted_frequency_counts = frequency_counts.sort_index()
+# #print(sorted_frequency_counts[:50])
+# print(sorted_frequency_counts)
 
-# plot figure
-plt.figure(figsize=(10, 6))
-sns.histplot(value_counts_host_id_0, bins=15, kde=True)
-plt.title("Host ID Occurrence Frequency Distribution")
-plt.xlabel("Number of Occurrences")
-plt.ylabel("Frequency")
-plt.xlim(0, 20)
-plt.show()
+# # plot figure
+# plt.figure(figsize=(10, 6))
+# sns.histplot(value_counts_host_id_0, bins=15, kde=True)
+# plt.title("Host ID Occurrence Frequency Distribution")
+# plt.xlabel("Number of Occurrences")
+# plt.ylabel("Frequency")
+# plt.xlim(0, 20)
+# plt.show()
 
-plt.figure(figsize=(10, 6))
-sns.boxplot(x=value_counts_host_id_0)
-plt.title("Boxplot of Host ID Occurrences")
-plt.xlabel("Number of Occurrences")
-plt.xlim(0, 20)
-plt.show()
+# plt.figure(figsize=(10, 6))
+# sns.boxplot(x=value_counts_host_id_0)
+# plt.title("Boxplot of Host ID Occurrences")
+# plt.xlabel("Number of Occurrences")
+# plt.xlim(0, 20)
+# plt.show()
 ```
 
 ```{python}
-# The line chart shows a sharp decline in frequency beyond 7, indicating a significant drop in the number of hosts with more listings.
-# Using 7 as the threshold balances capturing a manageable group of active hosts while excluding extreme cases for focused analysis.
+# # The line chart shows a sharp decline in frequency beyond 7, indicating a significant drop in the number of hosts with more listings.
+# # Using 7 as the threshold balances capturing a manageable group of active hosts while excluding extreme cases for focused analysis.
 
-hosts_to_remove = ghostHotelDf_unique.loc[ghostHotelDf_unique['calculated_host_listings_count'] > 7, 'host_id'].unique()
+# hosts_to_remove = ghostHotelDf_unique.loc[ghostHotelDf_unique['calculated_host_listings_count'] > 7, 'host_id'].unique()
 
-ghostHotelDf_filtered = ghostHotelDf_unique[~ghostHotelDf_unique['host_id'].isin(hosts_to_remove)]
+# ghostHotelDf_filtered = ghostHotelDf_unique[~ghostHotelDf_unique['host_id'].isin(hosts_to_remove)]
 
-print(f"Original DataFrame Shape: {ghostHotelDf_unique.shape}")
-print(f"Filtered DataFrame Shape: {ghostHotelDf_filtered.shape}")
+# print(f"Original DataFrame Shape: {ghostHotelDf_unique.shape}")
+# print(f"Filtered DataFrame Shape: {ghostHotelDf_filtered.shape}")
 
-print("Host IDs removed:", hosts_to_remove)
+# print("Host IDs removed:", hosts_to_remove)
 ```
 
 ```{python}
@@ -469,14 +477,15 @@ def stackFigure():
     sns.set_style("white")
     sns.set_context({"figure.figsize": (18, 10)})
     sns.barplot(x = numberDf.index, y = numberDf["total listings"], color = "yellow")
-    sns.barplot(x = numberDf.index, y = numberDf["private/shared rooms"], color = "blue")
+    # sns.barplot(x = numberDf.index, y = numberDf["private/shared rooms"], color = "blue")
     ghost_plot = sns.barplot(x = numberDf.index, y = numberDf["ghost hotels"], color = "red")
 
     raw_data_legend = plt.Rectangle((0,0),1,1,fc="yellow", edgecolor = 'none')
-    private_room_legend = plt.Rectangle((0,0),2,1,fc='blue',  edgecolor = 'none')
+    # private_room_legend = plt.Rectangle((0,0),2,1,fc='blue',  edgecolor = 'none')
     ghost_hotel_legend = plt.Rectangle((0,0),1,1,fc='red',  edgecolor = 'none')
     font = {'weight' : 'normal','size': 20}
-    l = plt.legend([raw_data_legend, private_room_legend, ghost_hotel_legend], ["total listings", "private/shared rooms","ghost hotel rooms"], ncol = 1, prop={'size':16},loc='upper left')
+    # l = plt.legend([raw_data_legend, private_room_legend, ghost_hotel_legend], ["total listings", "private/shared rooms","ghost hotel rooms"], ncol = 1, prop={'size':16},loc='upper left')
+    l = plt.legend([raw_data_legend, ghost_hotel_legend], ["total listings","ghost hotel rooms"], ncol = 1, prop={'size':16},loc='upper left')
     ghost_plot.set_ylabel("The Amount of Rooms",font)
     ghost_plot.set_title("Figure 1: The Composition of Listings on Airbnb of 33 Boroughs in London",fontsize=25)
     plt.yticks(fontsize= 10)
@@ -486,7 +495,7 @@ def stackFigure():
 
 
 
-【此处需要插入可视化部分的所有代码】
+【此处需要插入可视化部分的所有代码，格式需要和上面一样（不能添加markdown文字块，必须全部是python代码块；可以把所有文字化为代码块里的注释）】
 
 
 
@@ -505,6 +514,7 @@ def stackFigure():
 :::
 
 @Insideairbnb: https://insideairbnb.com/about/
+
 Collaborators:
 Murray Cox, John Morris, Taylor Higgins
 Past Collaborators:
@@ -566,6 +576,8 @@ For estimating how often an Airbnb listing is being rented out, and also approxi
 
 :::
 
+
+
 ## 5. What ethical considerations does the use of the InsideAirbnb data raise? 
 
 ::: {.duedate}
@@ -573,6 +585,13 @@ For estimating how often an Airbnb listing is being rented out, and also approxi
 ( 18 points; Answer due {{< var assess.group-date >}} )
 
 :::
+
+- Privacy and Data Protection: Ensuring that personal data is collected, stored, and used securely, with proper safeguards to prevent unauthorized access or breaches. This includes adhering to laws like GDPR and ensuring data anonymization or encryption when necessary.
+
+- Informed Consent: Data collectors must obtain explicit and informed consent from participants, making sure they understand how their data will be used, especially when dealing with sensitive information.
+
+- Bias and Discrimination: Data analysis can inadvertently introduce or perpetuate bias, which can lead to discriminatory outcomes. For example, certain groups may be overrepresented or underrepresented, causing skewed results or unfair treatment.
+
 
 ## 6. With reference to the InsideAirbnb data (*i.e.* using numbers, figures, maps, and descriptive statistics), what does an analysis of Hosts and the types of properties that they list suggest about the nature of Airbnb lettings in London? 
 
@@ -582,6 +601,26 @@ For estimating how often an Airbnb listing is being rented out, and also approxi
 
 :::
 
+While exploring @Insideairbnb data, we found that many hosts had multiple listings, and some listings had highly similar neighborhood overviews and descriptions, with locations that were very close to each other. This raises a question of whether this indicates a potential commercial operation model, commonly known as "ghost hotel". The "ghost hotel" refers to an entire apartment building which is functionally a hotel because most or all units are short-term rentals instead of tenant-occupied. However, such properties are unsupervised and do not comply with the same stringent health, safety and planning regulations required by law.
+
+These "ghost hotels" not only cause unfair competition to traditional hotel industry, but their high returns from short-term rentals also attract more hosts to convert their properties to short-term rentals, directly reducing the number of long-term rentals and pushing up rents, making it difficult for local residents to find affordable housing.
+
+How to identify ghost hotels from @Insideairbnb data is key to analysing this phenomenon. Since studies on ghost hotels are limited, we combined observed characteristics and previous studies to determine the method for identification. First, we found the hosts with multiple listings, calculated the geographic distance for all of their listings and used NLP to measure the similarity of neighborhood overviews and descriptions. If the distance is less than 200 meters and the text description similarity is greater than 0.5, it will be considered as potential ghost hotel. We further verified the filtered listings and found that some of the hosts with a large number of listings were not actually individuals, but legally registered companies. These types of listings, while different from traditional hotels, do not belong to the ghost hotel category. By examining host ID frequency distribution, we found that most hosts have 1-4 listings, while those with more than 7 listings are significantly fewer. Therefore, we set 7 as the threshold and considered hosts with more than this number as more likely to be company and excluded them. We finally identified 22,276 potential ghost hotels.
+
+```{python}
+stackFigure()
+```
+
+Figure 1 shows the proportion of ghost hotels in Airbnb listings in the 33 boroughs of London. It can be seen that the total number of listings in boroughs like Westminster, Tower Hamlets, Hackney are significantly greater than that in others, and the number of ghost hotels in these areas is also noticeably higher.
+
+```{python}
+ghProportionPlot()
+```
+
+Figure 2 shows the density of ghost hotels in each London borough. It can be seen that the areas of high density are concentrated in central London, where Westminster is the highest, while the outer boroughs have significantly lower densities.
+
+
+
 ## 7. Drawing on your previous answers, and supporting your response with evidence (*e.g.* figures, maps, EDA/ESDA, and simple statistical analysis/models drawing on experience from, e.g., CASA0007), how *could* the InsideAirbnb data set be used to inform the regulation of Short-Term Lets (STL) in London? 
 
 ::: {.duedate}
@@ -589,6 +628,9 @@ For estimating how often an Airbnb listing is being rented out, and also approxi
 ( 45 points; Answer due {{< var assess.group-date >}} )
 
 :::
+
+
+
 
 ## Sustainable Authorship Tools
 
