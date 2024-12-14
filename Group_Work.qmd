@@ -577,23 +577,23 @@ The methodology also presents interesting questions about transparency in the di
 ( 15 points; Answer due {{< var assess.group-date >}} )
 :::
 
-While exploring @Insideairbnb data, we found that many hosts had multiple listings, and some listings had highly similar neighborhood overviews and descriptions, with locations that were very close to each other. This raises a question of whether this indicates a potential commercial operation model, commonly known as "ghost hotel". The "ghost hotel" refers to an entire apartment building which is functionally a hotel because most or all units are short-term rentals instead of tenant-occupied. However, such properties are unsupervised and do not comply with the same stringent health, safety and planning regulations required by law.
+While exploring @Insideairbnb data, we found that some hosts have multiple listings. There are 1,652 hosts with more than 5 listings, accounting for 2.9% of all hosts, but they own a total of 26,060 listings, accounting for 27% of the overall listings. A small number of hosts control a large proportion of listings, and some listings had highly similar neighborhood overviews and descriptions, with locations that were very close to each other. This raises a question of whether this indicates a potential commercial operation model, commonly known as "ghost hotel". The "ghost hotel" refers to an entire apartment building which is functionally a hotel because most or all units are short-term rentals instead of tenant-occupied. However, such properties are unsupervised and do not comply with the same stringent health, safety and planning regulations required by law.
 
 These "ghost hotels" not only cause unfair competition to traditional hotel industry, but their high returns from short-term rentals also attract more hosts to convert their properties to short-term rentals, directly reducing the number of long-term rentals and pushing up rents, making it difficult for local residents to find affordable housing.
 
-How to identify ghost hotels from @Insideairbnb data is key to analysing this phenomenon. Since studies on ghost hotels are limited, we combined observed characteristics and previous studies to determine the method for identification. First, we found the hosts with multiple listings, calculated the geographic distance for all of their listings and used NLP to measure the similarity of neighborhood overviews and descriptions. If the distance is less than 200 meters and the text description similarity is greater than 0.5, it will be considered as potential ghost hotel. We further verified the filtered listings and found that some of the hosts with a large number of listings were not actually individuals, but legally registered companies. These types of listings, while different from traditional hotels, do not belong to the ghost hotel category. By examining host ID frequency distribution, we found that most hosts have 1-4 listings, while those with more than 7 listings are significantly fewer. Therefore, we set 7 as the threshold and considered hosts with more than this number as more likely to be company and excluded them. We finally identified 22,276 potential ghost hotels.
+How to identify ghost hotels from @Insideairbnb data is key to analysing this phenomenon. Since studies on ghost hotels are limited, we combined observed characteristics and previous studies to determine the method for identification. First, we found the hosts with multiple listings, calculated the geographic distance for all of their listings and used NLP to measure the similarity of neighborhood overviews and descriptions. If the distance is less than 200 meters and the text description similarity is greater than 0.5, it will be considered as ghost hotel. We finally identified 43,584 potential ghost hotels.
 
 ```{python}
 stackFigure()
 ```
 
-Figure 1 shows the proportion of ghost hotels in Airbnb listings in the 33 boroughs of London. It can be seen that the total number of listings in boroughs like Westminster, Tower Hamlets, Hackney are significantly greater than that in others, and the number of ghost hotels in these areas is also noticeably higher.
+Figure 1 shows the proportion of ghost hotels in Airbnb listings in the 33 boroughs of London. It can be seen that the total number of listings in Westminster is significantly greater than other boroughs, followed by Tower Hamlets, Camden and others. The number of ghost hotels in these boroughs is also noticeably higher.
 
 ```{python}
 ghProportionPlot()
 ```
 
-Figure 2 shows the density of ghost hotels in each London borough. It can be seen that the areas of high density are concentrated in central London, where Westminster is the highest, while the outer boroughs have significantly lower densities.
+Figure 2 shows the distribution of the proportion of ghost hotels across London boroughs. It can be seen that the areas with high proportions of ghost hotels are concentrated in central London, with the City of London having the highest proportion. The outer boroughs have significantly lower levels of ghost hotels.
 
 
 
