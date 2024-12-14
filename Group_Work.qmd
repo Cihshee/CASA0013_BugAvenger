@@ -89,10 +89,10 @@ import os
 ```{python}
 # Read Inside Airbnb data
 
-cols = ['id', 'name', 'description', 'neighborhood_overview', 'host_id','neighbourhood_cleansed', 
-        'latitude','longitude', 'room_type', 'price', 'minimum_nights_avg_ntm', 
-        'maximum_nights_avg_ntm', 'availability_30','availability_90','availability_365','number_of_reviews', 'review_scores_rating', 
-        'review_scores_accuracy','calculated_host_listings_count', 'reviews_per_month']
+cols = ['id', 'name', 'description', 'neighborhood_overview', 'host_id','neighbourhood_cleansed',
+        'latitude','longitude', 'room_type', 'price', 'minimum_nights_avg_ntm', 
+        'maximum_nights_avg_ntm', 'availability_30','availability_90','availability_365','number_of_reviews', 'review_scores_rating', 
+        'review_scores_accuracy','calculated_host_listings_count', 'reviews_per_month']
 
 # Read the listing.csv.gz compressed file through the URL
 df = pd.read_csv('https://github.com/Cihshee/CASA0013_BugAvenger/raw/refs/heads/main/data/listings.csv.gz', encoding='latin1', low_memory=False, usecols=cols)
@@ -466,10 +466,8 @@ print(f"Data frame is {ghostHotelDf_unique.shape[0]:,} x {ghostHotelDf_unique.sh
 
 number1Df = pd.DataFrame(df["neighbourhood_cleansed"].value_counts())
 number2Df = pd.DataFrame(ghostHotelDf_unique["neighbourhood_cleansed"].value_counts())
-# number3Df = pd.DataFrame(houseList["neighbourhood_cleansed"].value_counts())
 numberDf = pd.merge(number1Df, number2Df, how='outer',left_index=True,right_index=True)
-# numberDf = pd.merge(numberDf, number3Df, how='outer',left_index=True,right_index=True)
-numberDf.columns = ["total listings","private/shared rooms","ghost hotels"] 
+numberDf.columns = ["total listings", "ghost hotels"] 
 numberDf = numberDf.fillna(0)
 
 numberDf.head()
@@ -479,14 +477,11 @@ numberDf.head()
 def stackFigure():
     sns.set_style("white")
     sns.set_context({"figure.figsize": (18, 10)})
-    sns.barplot(x = numberDf.index, y = numberDf["total listings"], color = "yellow")
-    # sns.barplot(x = numberDf.index, y = numberDf["private/shared rooms"], color = "blue")
-    ghost_plot = sns.barplot(x = numberDf.index, y = numberDf["ghost hotels"], color = "red")
-    raw_data_legend = plt.Rectangle((0,0),1,1,fc="yellow", edgecolor = 'none')
-    # private_room_legend = plt.Rectangle((0,0),2,1,fc='blue',  edgecolor = 'none')
-    ghost_hotel_legend = plt.Rectangle((0,0),1,1,fc='red',  edgecolor = 'none')
+    sns.barplot(x = numberDf.index, y = numberDf["total listings"], color = "#bae4bc")
+    ghost_plot = sns.barplot(x = numberDf.index, y = numberDf["ghost hotels"], color = "#43a2ca")
+    raw_data_legend = plt.Rectangle((0,0),1,1,fc="#bae4bc", edgecolor = 'none')
+    ghost_hotel_legend = plt.Rectangle((0,0),1,1,fc='#43a2ca',  edgecolor = 'none')
     font = {'weight' : 'normal','size': 20}
-    # l = plt.legend([raw_data_legend, private_room_legend, ghost_hotel_legend], ["total listings", "private/shared rooms","ghost hotel rooms"], ncol = 1, prop={'size':16},loc='upper left')
     l = plt.legend([raw_data_legend, ghost_hotel_legend], ["total listings","ghost hotel rooms"], ncol = 1, prop={'size':16},loc='upper left')
     ghost_plot.set_ylabel("The Amount of Rooms",font)
     ghost_plot.set_title("Figure 1: The Composition of Listings on Airbnb of 33 Boroughs in London",fontsize=25)
@@ -517,67 +512,56 @@ def stackFigure():
 
 @Insideairbnb: https://insideairbnb.com/about/
 
+The @Insideairbnb data was collected by a team led by Murray Cox.
 Collaborators: Murray Cox, John Morris, Taylor Higgins
 Past collaborators: Alice Corona, Luca Lamonaca, Michael "Ziggy" Mintz, Anya Sophe Behn
+Independent advisory board: Alice Corona, Claire Colomb, Peter Phibbs, Sito Veracruz, Thorben Wieditz
 
 
 ## 2. Why did they collect the InsideAirbnb data?
 
 ::: {.duedate}
-@Insideairbnb argued, Airbnb as a privately-owned company, there is currently no mechanism for holding Airbnb accountable for its own actions. 
-The public’s ability to see the truth behind Airbnb’s selected data releases is limited. Unfortunately, Airbnb’s so-called transparency initiatives are no substitute for genuine audits or for genuine accountability.
-Thus, this organization believes in monitoring and analyzing airbnb's regularly posteddatasets to show the public that majority of Airbnb listings in most cities are entire homes, many of which are rented all year round - disrupting housing and communities.
-
-##Reference 
-#Cox, M., and T. Slee. 2016. “How Airbnb’s Data Hid the Facts in New York City.” Inside Airbnb. http://insideairbnb.com/reports/how-airbnbs-data-hid-the-facts-in-new-york-city.pdf
-#https://insideairbnb.com/
-
 ( 4 points; Answer due Week 7 )
-
 :::
 
-```{python}
-#| output: asis
-print(f"One of way to embed output in the text looks like this: after cleaning, we were left with {df.shape[0]:,} rows of data.")
-```
+@Insideairbnb argued, Airbnb as a privately-owned company, there is currently no mechanism for holding Airbnb accountable for its own actions. 
+The public’s ability to see the truth behind Airbnb’s selected data releases is limited. Unfortunately, Airbnb’s so-called transparency initiatives are no substitute for genuine audits or for genuine accountability.
 
-This way is also supposed to work (`{python} f"{df.shape[0]:,}" `) but I've found it less reliable.
+Thus, this organization believes in monitoring and analyzing airbnb's regularly posteddatasets to show the public that majority of Airbnb listings in most cities are entire homes, many of which are rented all year round - disrupting housing and communities.
 
-```{python}
-ax = df.host_listings_count.plot.hist(bins=50)
-ax.set_xlim([0,500])
-```
 
 ## 3. How did they collect it?
 
 ::: {.duedate}
+( 5 points; Answer due Week 8 )    
+:::
 
-( 5 points; Answer due Week 8 )
-The data sets of @Insideairbnb were assembled by programmatically compiling public information from  Airbnb’s website, but they were implemented and collected independently. Both data sets attempt to locate all the listings within a city, and then visit the page for each listing to collect listing data, including the host ID. The host ID allows an analysis of the number of listings posted by a single host. 
+The data sets of @Insideairbnb were assembled by web scraping techniques from  Airbnb’s website, but they were implemented and collected independently. 
+
+Both data sets attempt to locate all the listings within a city, and then visit the page for each listing to collect listing data, including the host ID. The host ID allows an analysis of the number of listings posted by a single host. 
+
 For estimating how often an Airbnb listing is being rented out, and also approximating a listing's income, @Insideairbnb used an occupancy model. They christened the occupancy model as "San Francisco Model", in honor of the public policy and urban planners working for that fair city who created occupancy models to quantify the impact of Airbnb on housing.
 
-- Reference 
-    - Cox, M., and T. Slee. 2016. “How Airbnb’s Data Hid the Facts in New York City.” Inside Airbnb. http://insideairbnb.com/reports/how-airbnbs-data-hid-the-facts-in-new-york-city.pdf
-    - https://insideairbnb.com/data-assumptions/ 
-
-:::
 
 ## 4. How does the method of collection (Q3) impact the completeness and/or accuracy of the InsideAirbnb data? How well does it represent the process it seeks to study, and what wider issues does this raise?
 
 ::: {.duedate}
-
 ( 11 points; Answer due Week 9 )
-
 :::
 
+The data collection methodology of @Insideairbnb, while innovative, has important implications for the completeness and accuracy of their dataset. The web scraping approach effectively captures public listings but inherently misses private or temporarily hidden properties. Since data collection occurs at monthly intervals, rapid market changes might go unrecorded, creating potential blind spots in understanding market dynamics.
+
+The project's use of the "San Francisco Model" for estimating occupancy and income introduces additional complexity. While this model provides structured estimates, it may not accurately reflect the nuanced variations across different markets or capture actual booking patterns. The inability to access real transaction data or direct communications between hosts and guests further limits our understanding of platform usage patterns.
+
+These methodological constraints raise significant issues for policy-making. Cities and regulators, working with estimates and incomplete information, face challenges in crafting effective regulations. This becomes particularly problematic when trying to distinguish between professional operators and casual hosts, or when assessing the true impact of short-term rentals on housing availability.
+
+The methodology also presents interesting questions about transparency in the digital age. While @Insideairbnb aims to increase market transparency, their data collection limitations create their own form of opacity. Researchers and policymakers must carefully balance the value of available data against its known limitations, often needing to seek additional data sources for a more complete understanding of market dynamics.
 
 
 ## 5. What ethical considerations does the use of the InsideAirbnb data raise? 
 
 ::: {.duedate}
-
 ( 18 points; Answer due {{< var assess.group-date >}} )
-
 :::
 
 - Privacy and Data Protection: Ensuring that personal data is collected, stored, and used securely, with proper safeguards to prevent unauthorized access or breaches. This includes adhering to laws like GDPR and ensuring data anonymization or encryption when necessary.
@@ -590,9 +574,7 @@ For estimating how often an Airbnb listing is being rented out, and also approxi
 ## 6. With reference to the InsideAirbnb data (*i.e.* using numbers, figures, maps, and descriptive statistics), what does an analysis of Hosts and the types of properties that they list suggest about the nature of Airbnb lettings in London? 
 
 ::: {.duedate}
-
 ( 15 points; Answer due {{< var assess.group-date >}} )
-
 :::
 
 While exploring @Insideairbnb data, we found that many hosts had multiple listings, and some listings had highly similar neighborhood overviews and descriptions, with locations that were very close to each other. This raises a question of whether this indicates a potential commercial operation model, commonly known as "ghost hotel". The "ghost hotel" refers to an entire apartment building which is functionally a hotel because most or all units are short-term rentals instead of tenant-occupied. However, such properties are unsupervised and do not comply with the same stringent health, safety and planning regulations required by law.
@@ -618,10 +600,9 @@ Figure 2 shows the density of ghost hotels in each London borough. It can be see
 ## 7. Drawing on your previous answers, and supporting your response with evidence (*e.g.* figures, maps, EDA/ESDA, and simple statistical analysis/models drawing on experience from, e.g., CASA0007), how *could* the InsideAirbnb data set be used to inform the regulation of Short-Term Lets (STL) in London? 
 
 ::: {.duedate}
-
 ( 45 points; Answer due {{< var assess.group-date >}} )
-
 :::
+
 
 
 
@@ -634,5 +615,8 @@ Your QMD file should automatically download your BibTeX and CLS files and any ot
 
 Written in Markdown and generated from [Quarto](https://quarto.org/). Fonts used: [Spectral](https://fonts.google.com/specimen/Spectral) (mainfont), [Roboto](https://fonts.google.com/specimen/Roboto) (<span style="font-family:Sans-Serif;">sansfont</span>) and [JetBrains Mono](https://fonts.google.com/specimen/JetBrains%20Mono) (`monofont`). 
 
-## References
 
+## References
+- Cox, M., and T. Slee. 2016. “How Airbnb’s Data Hid the Facts in New York City.” Inside Airbnb. http://insideairbnb.com/reports/how-airbnbs-data-hid-the-facts-in-new-york-city.pdf
+- Li H, Kim Y, Srinivasan K. Market shifts in the sharing economy: The impact of Airbnb on housing rentals[J]. Management Science, 2022, 68(11): 8015-8044.
+- https://insideairbnb.com/data-assumptions/ 
