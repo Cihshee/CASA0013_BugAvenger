@@ -1,0 +1,866 @@
+---
+bibliography: bugavenger.bib
+csl: harvard-cite-them-right.csl
+title: BugAvenger's Group Project
+execute:
+  echo: false
+  freeze: true
+format:
+  html:
+    code-copy: true
+    code-link: true
+    toc: true
+    toc-title: On this page
+    toc-depth: 2
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+  pdf:
+    include-in-header:
+      text: |
+        \addtokomafont{disposition}{\rmfamily}
+    mainfont: Spectral
+    sansfont: Roboto Flex
+    monofont: Liberation Mono
+    papersize: a4
+    geometry:
+      - top=25mm
+      - left=40mm
+      - right=30mm
+      - bottom=25mm
+      - heightrounded
+    toc: false
+    number-sections: false
+    colorlinks: true
+    highlight-style: github
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .qmd
+      format_name: quarto
+      format_version: '1.0'
+      jupytext_version: 1.16.4
+  kernelspec:
+    display_name: Python (base)
+    language: python
+    name: base
+---
+
+
+
+## Declaration of Authorship {.unnumbered .unlisted}
+
+We, BugAvenger, pledge our honour that the work presented in this assessment is our own. Where information has been derived from other sources, we confirm that this has been indicated in the work. Where a Large Language Model such as ChatGPT has been used we confirm that we have made its contribution to the final submission clear.
+
+Date: 16/12/2024
+
+Student Numbers: 24084553; 24038678; 24055720; 24221916; 24110628
+
+
+## Brief Group Reflection
+
+| What Went Well       | What Was Challenging |
+| ---------------------| -------------------- |
+| Cooperation          | NLP Algorithm        |
+| Workflow Construction| Data Interpretation  |
+
+## Priorities for Feedback
+
+Are there any areas on which you would appreciate more detailed feedback if we're able to offer it?
+
+1. Are there things that can be optimised in our nlp section and analysis section of the code?
+2. Can our argumentation continue to be refined?
+3. Is the readability of the report up to scratch?
+4. Where are the demerits in our report?
+
+{{< pagebreak >}}
+
+```{python}
+# Reproducible Code
+# Install and import packages
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import seaborn as sns
+import geopandas as gpd
+import nltk
+from nltk.tokenize import word_tokenize 
+from nltk.corpus import stopwords 
+from gensim import corpora,models,similarities 
+from geopy.distance import geodesic 
+from shapely import wkt 
+import os
+```
+
+```{python}
+# Read Inside Airbnb data
+
+cols = ['id', 'name', 'description', 'neighborhood_overview', 'host_id','neighbourhood_cleansed',
+        'latitude','longitude', 'room_type', 'price', 'minimum_nights_avg_ntm',
+        'maximum_nights_avg_ntm', 'availability_30','availability_90','availability_365','number_of_reviews', 'review_scores_rating',
+        'review_scores_accuracy','calculated_host_listings_count', 'reviews_per_month']
+
+# Read the listing.csv.gz compressed file through the URL
+df = pd.read_csv('https://github.com/Cihshee/CASA0013_BugAvenger/raw/refs/heads/main/data/listings.csv.gz', encoding='latin1', low_memory=False, usecols=cols)
+
+# Print the dimensions of the loaded DataFrame
+#print(f"Data frame is {df.shape[0]:,} x {df.shape[1]}")
+```
+
+```{python}
+# Calculate the total number of missing values for each column
+# Sort the results in descending order to see columns with the most missing values first
+df.isnull().sum(axis=0).sort_values(ascending=False);
+```
+
+```{python}
+# Drop rows where the 'id' column has missing (NaN) values
+# 'inplace=True' applies the change directly to the DataFrame
+df.drop(df[df.id.isna()].index.values, axis=0, inplace=True);
+```
+
+```{python}
+# Next, we check for rows that still have lots of NaN.
+# From following output, we find several rows have 6 NaNs. By checking, we found that these rows also lost a lot of important information that may be used in subsequent analysis (such as "latitude", "longitude", "host_id").
+# Therefore, these rows which lost much important information are also needed to be deleted.
+df.isnull().sum(axis=1).sort_values(ascending=False);
+```
+
+```{python}
+# Filter rows where the 'longitude' and 'latitude' column can be converted to a numeric value
+# 'errors="coerce"' replaces invalid parsing with NaN, and 'notna()' keeps only valid rows
+df = df[pd.to_numeric(df['longitude'], errors='coerce').notna()]
+df = df[pd.to_numeric(df['latitude'], errors='coerce').notna()]
+
+df.drop(df[df.longitude.isna()].index.values, axis=0, inplace=True)
+df.drop(df[df.latitude.isna()].index.values, axis=0, inplace=True)
+
+df.drop(df[df.neighborhood_overview.isna() & df.description.isna()].index.values, axis=0, inplace=True)
+
+# Print the number of rows remaining in the DataFrame after all filtering
+#print(df.shape[0])
+```
+
+```{python}
+# Remove "$" symbol and try to convert to float number
+df['price'] = df['price'].str.replace('$','').str.strip()
+df['price'] = pd.to_numeric(df['price'], errors='coerce')
+
+df['maximum_nights_avg_ntm'] = pd.to_numeric(df['maximum_nights_avg_ntm'], errors='coerce') 
+df['minimum_nights_avg_ntm'] = pd.to_numeric(df['minimum_nights_avg_ntm'], errors='coerce')
+df['reviews_per_month'] = pd.to_numeric(df['reviews_per_month'], errors='coerce') 
+df['calculated_host_listings_count'] = pd.to_numeric(df['calculated_host_listings_count'], errors='coerce') 
+df['availability_30'] = pd.to_numeric(df['availability_30'], errors='coerce') 
+df['availability_90'] = pd.to_numeric(df['availability_90'], errors='coerce') 
+df['availability_365'] = pd.to_numeric(df['availability_365'], errors='coerce') 
+df['number_of_reviews'] = pd.to_numeric(df['number_of_reviews'], errors='coerce') 
+df['review_scores_rating'] = pd.to_numeric(df['review_scores_rating'], errors='coerce') 
+df['review_scores_accuracy'] = pd.to_numeric(df['review_scores_accuracy'], errors='coerce') 
+df['review_scores_accuracy'] = pd.to_numeric(df['review_scores_accuracy'], errors='coerce') 
+
+#df.to_csv('df.csv', index=False, encoding='utf-8')
+# Filter rows by room type
+# Choose specify columns to include
+houseList = df.loc[df["room_type"].isin(["Entire home/apt","Private room","Shared room"]),["id","host_id","room_type","description","neighborhood_overview","longitude","latitude","calculated_host_listings_count","neighbourhood_cleansed"]]
+
+#print(houseList.shape[0])
+```
+
+```{python}
+# Group the 'houseList' DataFrame by the 'neighbourhood_cleansed' column
+# For each neighborhood group, count the occurrences of each 'room_type'
+houseList.groupby('neighbourhood_cleansed')['room_type'].value_counts();
+```
+
+```{python}
+# Check for duplicate values in the 'id' column
+duplicate_count = df['id'].duplicated(keep=False).sum()
+#print(f"the count of duplicate id: {duplicate_count}")
+```
+
+```{python}
+# Define sgensimSimilarities() and gensimilarities()
+
+#nltk.download('stopwords')
+#nltk.download('punkt')
+#nltk.download('punkt_tab')
+
+import requests
+
+response = requests.get('https://raw.githubusercontent.com/Cihshee/CASA0013_BugAvenger/main/data/London_Spatial_Stopwords_list_1126.CSV')
+response.raise_for_status()  # Check if the request was successful
+stopWords_london = set(response.text.split())  # Split the text content into a set of words
+
+# Get a collection of common English words("the", "is", "and", etc.), which will be excluded from the similarity calculation
+stopWords = set(stopwords.words('english')) 
+stopWords = stopWords | stopWords_london 
+
+# Check the stopwords_list
+#print(stopWords_london)
+#print(stopWords)
+```
+
+```{python}
+def gensimSimilarities(test, textList):
+    """
+    if textList only contain one element, we take turns to use the two text as test
+    """
+    if len(textList)==1: 
+        sim = [max(gensimilarities(test, textList))] 
+        textList.append(test) 
+        test = textList.pop(0)
+        sim.append(max(gensimilarities(test, textList))) 
+        # use the small one as the similarity
+        sim = min(sim) 
+    else:
+        sim = max(gensimilarities(test, textList))
+    return sim
+```
+
+```{python}
+def gensimilarities(test,textList):
+    """
+    use tf-idf to construst the importance of the words, and use the gensim to calculate the similarity
+    """
+    allWordsList = []
+    # when there are only one element, the function will always return 0
+    if len(textList)==1:
+        textList.append("0") 
+    for text in textList:
+        # separate the words and exclude the words in stopwords
+        wordsList = [word for word in word_tokenize(text) if word not in stopWords]
+        allWordsList.append(wordsList)
+    dictionary = corpora.Dictionary(allWordsList)
+    corpus = [dictionary.doc2bow(wordsList1) for wordsList1 in allWordsList]    
+    # Convert the test text into BOW format and filter for disused words
+    testWords = dictionary.doc2bow([word for word in word_tokenize(test) if word not in stopWords])
+    # Build TF-IDF models and similarity indexes
+    tfidf = models.TfidfModel(corpus)
+    index = similarities.SparseMatrixSimilarity(tfidf[corpus], num_features=len(dictionary.keys()))
+    sim = index[tfidf[testWords]]
+    return sim
+```
+
+```{python}
+# Define checkDescription() that determines if a room description or neighborhood information is highly similar to the description of a set of landlord listings
+# If the similarity exceeds a threshold (0.5), the room is categorized as ghost hotel
+
+def checkDescription(checkroom,ghostHotel):
+    """
+    Define checkDescription() that determines if a room description or neighborhood information is highly similar to the description of a set of landlord listings
+    
+    If the similarity exceeds a threshold (0.5), the room is categorized as ghost hotel
+    """
+    checkDf = houseList.loc[houseList["id"]==checkroom,["id", "neighborhood_overview","description"]]
+    samehostDf = houseList[houseList["id"].isin(ghostHotel)]
+    simlarity1 = 0
+    simlarity2 = 0
+    overviewDf = samehostDf["neighborhood_overview"].dropna()
+    checkOverview = checkDf["neighborhood_overview"].dropna()
+
+    if overviewDf.shape[0]>0 and checkOverview.shape[0] > 0:
+        simlarity1 = gensimSimilarities(checkOverview.iloc[0],list(overviewDf)) 
+
+    if samehostDf.shape[0] != overviewDf.shape[0]: 
+        descripDf = samehostDf["description"].dropna()
+        checkDesc = checkDf["description"].dropna()
+        if descripDf.shape[0]>0 and checkDesc.shape[0] > 0: 
+            simlarity2 = gensimSimilarities(checkDesc.iloc[0], list(descripDf)) 
+    simlarity = max(simlarity1, simlarity2)
+
+    # If the similarity exceeds a threshold (0.5), the room is categorized as ghost hotel
+    if simlarity > 0.5:
+        return True
+    else:
+        return False
+```
+
+```{python}
+# Define mergeSubList()
+
+def mergeSubList(initiallist):
+    """
+    If there are same id in different sublist, merge the sublist
+    """
+    length = len(initiallist)
+    for init1 in range(length):
+        for init2 in range(init1 + 1, length):
+            if initiallist[init1] == [0]:
+                break
+            if initiallist[init2] == [0]:
+                continue
+
+            # to see whether the two sublists have same elements
+            x = list(set(initiallist[init1]+initiallist[init2]))
+            y = len(initiallist[init1]) + len(initiallist[init2])           
+            
+            # If the merged length is less, there is a duplicate
+            if len(x) < y:
+                initiallist[init2] = [0]
+                initiallist[init1] = x
+    return initiallist
+```
+
+```{python}
+### [from here there is a Large and Long Workflow till the visualisation and analysis part]
+# The main part to find the ghost hotels
+
+# Creat a list called "ghostlist" which contains all the 'id' for ghost rooms, and each sublist of ghostlist is a "ghost hotel".
+
+# - Initialize data and temporary rows
+# - Iterate through listings:
+#    - Filter a subset of listings by host
+#    - Skip if the host has <= 1 listing
+#    - Group by geographic location
+#    - Group by text description
+#    - Merge groups and retain valid groups
+# - Update results (ghostList) and unprocessed listing indices
+# - Remove temporary rows and clean the data
+
+# A listing must meet the following criteria to be classified as a "ghost hotel":
+
+# - Geographical condition: Distance is less than 200 meters.
+# - Description condition: Text descriptions are similar.
+
+def find_ghost_hotels():
+    indexlist = list(houseList.index)
+    ghostList = []
+
+    houseList.loc["ini",["id","host_id","description","neighborhood_overview","longitude","latitude","calculated_host_listings_count"]] = [0,0,"0","0",0,0,0]
+    while len(indexlist) > 0 :
+        # if one have more than one private or shared rooms on Airbnb, it has the suspicion to be ghost hotels
+        if houseList.loc[indexlist[0],"calculated_host_listings_count"] > 1:
+            # find the house which have the same host_id and put them together
+            ghostdf = houseList[houseList["host_id"] == houseList.loc[indexlist[0],"host_id"]]
+            ghostHost = list(ghostdf['id'])
+            # it is a list used to store the ghost hotels list
+            initiallist = [[0]]
+            for i in ghostdf.index:
+                # if there are no rooms within the distance it will still be False
+                isghost = False
+                for init in initiallist:
+                    for ini in init:
+                        # the longitude and latitude of the rooms in list
+                        iniLogLat = (houseList.loc[houseList["id"]==ini,"longitude"].iloc[0],houseList.loc[houseList["id"]==ini,"latitude"].iloc[0])
+                        iLonLat = (ghostdf.loc[i,"longitude"],ghostdf.loc[i,"latitude"])
+                        # use the longitude and latitude to calculate the distance
+                        distance = geodesic(iniLogLat, iLonLat).m
+                        # if the distance is less than 200m, we consider it as ghost hotel
+                        #(distance of 50 to 500 meters is manually tried and find the optimal one)
+                        if distance < 200:
+                            init.append(ghostdf.loc[i,"id"])
+                            isghost = True
+                            break
+                if not isghost:
+                    initiallist.append([ghostdf.loc[i,"id"]])
+        
+            # use the description to calculate the distance, in case of inaccurate positioning
+            initiallist1 = [[0]]
+            for checkroom in ghostHost:
+                isghost = False
+                for ghostHotel in initiallist1:
+                    if checkDescription(checkroom,ghostHotel): 
+                        ghostHotel.append(checkroom)
+                        isghost = True
+                        break
+                if not isghost:
+                    initiallist1.append([checkroom])
+            initiallist.extend(initiallist1)
+            initiallist = mergeSubList(initiallist)
+            # the list with more than one id is a ghost hotel
+            initiallist = [init for init in initiallist if len(init)>1]
+            ghostList.extend(initiallist)
+            # delete the rows that we have already checked
+            indexlist = [index for index in indexlist if index not in ghostdf.index]
+    
+        else:
+            # if the host don't have more than one private or shared rooms, it is not ghost hotels
+            del indexlist[0]
+        
+    houseList.drop("ini",inplace=True)
+
+#find_ghost_hotels()
+```
+
+```{python}
+#ghostHotelDf = pd.DataFrame(columns = df.columns) 
+
+#for rooms in ghostList:
+#    # Using id, find the corresponding complete information in the original dataframe df and summarize it in the new dataframe ghostHotelDf
+#    ghostHotelDf = ghostHotelDf._append(df.loc[df["id"].isin(rooms)])
+
+#print(ghostHotelDf.shape[0]) # 49848
+```
+
+```{python}
+#ghostHotelDf.head()
+
+#room_type_counts = ghostHotelDf['room_type'].value_counts()
+#print(room_type_counts)
+
+## Entire home/apt    32952
+## Private room       16709
+## Shared room          187
+```
+
+```{python}
+# Processing `ghostHotelDf`:
+# We checked the resulting `ghostHotelDf` and found that there are 'id' duplicates in it, so we need to remove the duplicate 'id' row.
+
+#value_counts_id_0 = ghostHotelDf['id'].value_counts()
+#print(value_counts_id_0[:10])
+
+# ghostHotelDf_unique: removed duplicates
+#ghostHotelDf_unique = ghostHotelDf[~ghostHotelDf['id'].duplicated(keep='first')]
+
+#value_counts_id_1 = ghostHotelDf_unique['id'].value_counts()
+#print(value_counts_id_1[:10])
+
+#print(f"Data frame is {ghostHotelDf_unique.shape[0]:,} x {ghostHotelDf_unique.shape[1]}")
+## Data frame is 43,584 x 18
+```
+
+```{python}
+# Visualization and Analysis Part
+
+"""
+URL of the raw CSV file on GitHub:
+If the codes above taking too long to run, you can continue directly using the data in the url below
+"""
+url1 = "https://github.com/Cihshee/CASA0013_BugAvenger/raw/refs/heads/main/data/df.csv.gz"
+url2 = "https://raw.githubusercontent.com/Cihshee/CASA0013_BugAvenger/refs/heads/main/data/ghostHotelDf_unique.csv"
+# Read the csv file into a pandas DataFrame
+df = pd.read_csv(url1)
+ghostHotelDf_unique = pd.read_csv(url2)
+```
+
+```{python}
+"""
+Processing `ghostHotelDf_unique` and build a new datafram `airbnb_gh_final` for analysis and visualisation:
+Compares the 'id' column in `ghostHotelDf_unique` with the 'id' column in `df`, and identifies and marks rows in `df` that 
+'id' values `ghostHotelDf_filtered`, assigning a value of 1 to the 'is_it_gh' column for matches. 
+Then we get a complete dataframe of airbnbs, containing a column of data labeled whether it is a ghost hotel or not.
+"""
+
+airbnb_gh_final = df.copy()
+
+# initialise a new column 'is_it_gh', with a default value of 0
+airbnb_gh_final['is_it_gh'] = 0
+
+gh_ids = set(ghostHotelDf_unique['id'])
+# Loop through the `df` columns to see if the 'id' column in `df` exists in the 'id' column in `ghostHotelDf_filtered`
+for i in range(len(airbnb_gh_final)):
+    if airbnb_gh_final.loc[i, 'id'] in gh_ids:
+        airbnb_gh_final.loc[i, 'is_it_gh'] = 1
+
+#print(f"Data frame is {airbnb_gh_final.shape[0]:,} x {airbnb_gh_final.shape[1]}")
+airbnb_gh_final.head();
+```
+
+```{python}
+# Load in the geopackage of London boroughs
+url_boros = "https://raw.githubusercontent.com/Cihshee/CASA0013_BugAvenger/main/data/Boroughs.gpkg"
+boros = gpd.read_file(url_boros)
+#print(boros.crs)
+```
+
+```{python}
+# Overview: The Distribution of the Proportion of Ghost Hotels in Total Airbnbs for Each Borough.
+
+# Calculate the number of ghost hotels
+summary = airbnb_gh_final.groupby('neighbourhood_cleansed').agg(
+    total_listings=('is_it_gh', 'count'),
+    ghost_hotels=('is_it_gh', 'sum')).reset_index()
+
+# Calculate and append a column of the percentage of ghost hotels in all airbnbs.
+summary['ghost_hotel_percentage'] = (summary['ghost_hotels'] / summary['total_listings']) * 100
+
+# Merge the `boros` and `summary` on borough name and create a new dataframe `boros_ghproportion` for visualisation
+boros_ghproportion = boros.merge(summary, how='left', left_on='NAME', right_on='neighbourhood_cleansed')
+```
+
+```{python}
+def ghProportionPlot():
+    fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+    boros_ghproportion.plot(edgecolor=(1, 1, 1, 1),linewidth=1, column='ghost_hotel_percentage',cmap='Blues',
+                            legend=True,legend_kwds={'label': "Ghost Hotel Percentage (%)"},ax=ax)
+    for idx, row in boros_ghproportion.iterrows():
+        centroid = row['geometry'].centroid
+        ax.text(
+            centroid.x, centroid.y,
+            row['neighbourhood_cleansed'],
+            fontsize=6,
+            ha='center',
+            va='center',
+            color='black')
+    
+    ax.set_title("Figure 1: The Distribution of Ghost Hotels' Proportion \nin Total Airbnbs for Each Borough in 2024", fontsize=16)
+    ax.axis('off')
+    plt.show()
+```
+
+```{python}
+"""
+Overview of rentals for airbnb and ghost hotel for the next 180 days: 
+Filter out airbnb and ghost hotels that have been booked more than 180 days of unbooked days in the future calendar year, 
+and calculate their shares in all airbnbs.
+"""
+
+# Filter out the ghost hotels and 'availability_365' is greater than 180, and add new column gh_activity_180
+airbnb_gh_final['gh_rented_180'] = airbnb_gh_final.apply(lambda row: 1 if row['is_it_gh'] == 1 and row['availability_365'] >= 180 else 0, axis=1)
+
+# Calculate the count of 
+total_count = len(airbnb_gh_final)
+#print(f"The total count of airbnbs is {total_count}.")
+count_activity_no180_gh = ((airbnb_gh_final['is_it_gh'] == 1) & (airbnb_gh_final['gh_rented_180'] == 0)).sum()
+#print(f"The count of ghost hotels that being booked under 180 days in the next calendar year is {count_activity_no180_gh}.")
+count_activity_180_gh = ((airbnb_gh_final['is_it_gh'] == 1) & (airbnb_gh_final['gh_rented_180'] == 1)).sum()
+#print(f"The count of ghost hotels that being booked over 180 days in the next calendar year is {count_activity_180_gh}.")
+
+share_activity_no180_gh = (count_activity_no180_gh / total_count) *100
+share_activity_180_gh = (count_activity_180_gh / total_count) *100
+#print(f"The share of ghost hotels that being booked over 180 days in all airbnbs in the next calendar year is {round(share_activity_no180_gh)}%.")
+#print(f"The share of ghost hotels that being booked over 180 days in all airbnbs in the next calendar year is {round(share_activity_180_gh)}%.")
+```
+
+```{python}
+"""
+Comparison of annual revenue for long-term rentals and ghost hotels: 
+The effectiveness of the 90-day rule in preventing the conversion of long-term rental housing into ghost hotels in London 
+is more likely less effective than anticipated. 
+So we can look at the revenue difference between long rental houses and ghost hotels by calculating the ratio of the two, 
+combined with the London Boroughs to see how it performs regionally in London, and to extrapolate which boroughs have greater 
+potential for long-term rentals to be converted into ghost hotels. 
+"""
+
+# Load in the data of average long-term rental housing price per month in each borough
+url_longrental = url_longrental = "https://raw.githubusercontent.com/Cihshee/CASA0013_BugAvenger/refs/heads/main/data/longrent_price.csv"
+avg_longrental = pd.read_csv(url_longrental)
+
+# Calculate the annual revenue of long-term rental housing in each borough in London
+avg_longrental['longrental_annual_revenue'] = avg_longrental['average_rental_price'] * 12
+#print(avg_longrental.head())
+
+# Filter the ghost hotel（'is_it_gh' == 1）
+ghost_hotels = airbnb_gh_final[airbnb_gh_final['is_it_gh'] == 1]
+
+# Calculate the average price of ghost hotels per night in each borough
+ave_ghost = ghost_hotels.groupby('neighbourhood_cleansed')['price'].mean().reset_index()
+
+# Calculate the annual revenue for all ghost hotels in an idealised scenario (following the 90-day STL)
+ave_ghost['gh_annual_revenue'] = ave_ghost['price'] * 90
+#print(ave_ghost.head())
+```
+
+```{python}
+# select the data used for ratio calculation
+avg_longrental_selected = avg_longrental[['area_name','longrental_annual_revenue']]
+ave_ghost_selected = ave_ghost[['neighbourhood_cleansed','gh_annual_revenue']]
+
+# Using 'neighbourhood_cleansed' as an index to merge the dataframe, 
+# and calculate the ratio of annual revenue of ghost hotel and long-term rental house.
+summary2 = summary.merge(avg_longrental_selected, left_on='neighbourhood_cleansed', right_on='area_name')
+summary2 = summary2.merge(ave_ghost_selected, on='neighbourhood_cleansed')
+summary2['ratio_long/gh'] = (summary2['gh_annual_revenue'] / summary2['longrental_annual_revenue']) * 100
+#summary2.to_csv('summary2.csv', index=False, encoding='utf-8')
+
+# Print out the result of the comparison
+# Notably, the effectiveness of the 90-day rule is highly limited in Kensington and Chelsea and the City of London, 
+# where the annual revenues of ghost hotels are equivalent to 67.0% and 79.4% of the revenues of long-term lettings in these areas.
+revenue_annual_compare = summary2.sort_values(by='ratio_long/gh', ascending=False)
+#print(revenue_annual_compare[['area_name','ratio_long/gh']])
+
+# Merge the `boros` and `summary2` on borough name and create a new dataframe `boros_ghRevenue` for visualisation
+boros_ghRevenue = boros.merge(summary2, how='left', left_on='NAME', right_on='neighbourhood_cleansed')
+```
+
+```{python}
+def ghRevenue_ratioPlot():
+    fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+    boros_ghRevenue.plot(edgecolor=(1, 1, 1, 1),linewidth=1, column='ratio_long/gh',cmap='Blues',
+                            legend=True,legend_kwds={'label': "Annual Revenue of Ghost Hotel / Long-term Rental Housing(%)"},ax=ax)
+    # highlight the ratio over 65%
+    highlighted = boros_ghRevenue[boros_ghRevenue['ratio_long/gh'] > 65]
+    highlighted.plot(
+        edgecolor='#CC0000',
+        linewidth=2,
+        facecolor='none',
+        ax=ax)
+    # set the legend of highlight part
+    highlight_patch = mpatches.Patch(edgecolor='#CC0000', facecolor='none', linewidth=2, label='> 65%')
+    handles, labels = ax.get_legend_handles_labels()
+    handles.append(highlight_patch)
+    labels.append('Annual Revenue of Ghost Hotel / \nLong-term Rental Housing(%) > 65%')
+    ax.legend(handles=handles, labels=labels, loc='lower right')
+    
+    for idx, row in boros_ghproportion.iterrows():
+        centroid = row['geometry'].centroid
+        ax.text(
+            centroid.x, centroid.y,
+            row['neighbourhood_cleansed'],
+            fontsize=6,
+            ha='center',
+            va='center',
+            color='black')
+    
+    ax.set_title("Figure 2: The Distribution for the Annual Revenue Ratio of Ghost Hotel Under 90-day Regulation \nto Long-term Rental Housing Based on 2024", fontsize=16)
+    ax.axis('off')
+    plt.show()
+```
+
+```{python}
+"""
+Calculate approximately how many ghost hotels broke the 90-day STL in the past calendar year and what their characteristics are.
+To calculate the approximate days that ghost hotels have been rented in the past year, we use the 'occupancy model' in 
+'Short-term and ho.loc[:, liday letting in London' by Georgie Cosh, gives a formula: 
+occupancy nights = (reviews / the review rate of 50%) * (an average length of stay) 
+After calculating the occupancy night of each ghost hotel, we can filter out which ghost hotels broke the 90-day STL. 
+"""
+ghost_hotels = airbnb_gh_final[airbnb_gh_final['is_it_gh'] == 1].copy()
+# Calculate occupancy nights that ghost hotels have been rented in the past year.
+# 'reviews_per_month' is the average number of reviews per month
+# 'minimum_nights_avg_ntm' is the average minimum_night value from the calendar (looking at 365 nights in the future)
+ghost_hotels.loc[:, 'reserves_yearly'] = (ghost_hotels['reviews_per_month'] / 0.5) * 12
+ghost_hotels.loc[:, 'days_yearly'] = ghost_hotels['minimum_nights_avg_ntm'] * ghost_hotels['reserves_yearly']
+#ghost_hotels['days_yearly'].mean()
+
+# Data error analysis: due to the missing value of 'reviews_per_month' data and 'minimum_nights_avg_ntm' for some airbnbs, 
+# there would be an error in counting the counts of ghost hotels that occupancy nights is over 90 days.
+na_count1 = ghost_hotels['reviews_per_month'].isna().sum()
+#print("NA counts in reviews_per_month:", na_count1)
+## NA counts in reviews_per_month: 9123
+na_count2 = ghost_hotels['minimum_nights_avg_ntm'].isna().sum()
+#print("NA counts in minimum_nights_avg_ntm:", na_count2)
+## NA counts in minimum_nights_avg_ntm: 1
+na_count3 = ghost_hotels['days_yearly'].isna().sum()
+#print("NA counts in days_yearly:", na_count3) 
+## NA counts in days_yearly: 9124
+
+# Add a new column labelling ghost hotels with more than 90 days of occupancy
+ghost_hotels.loc[:, '90_flag'] = (ghost_hotels['days_yearly'] > 90).astype(int)
+ghdays_90 = ghost_hotels[ghost_hotels['90_flag'] == 1]
+#print(f"The count of ghost hotels that occupancy nights was over 90 days in the past calendar year is {len(ghdays_90)}.")
+## The count of ghost hotels that occupancy nights was over 90 days in the past calendar year is 10989.
+```
+
+```{python}
+# Transform the `ghost_hotels` from a dataframe into a GeoDataFrame, and reset the crs into 27700
+ghost_gdf = gpd.GeoDataFrame(
+    ghost_hotels, 
+    geometry=gpd.points_from_xy(ghost_hotels['longitude'], ghost_hotels['latitude']),
+    crs='EPSG:4326'
+)
+ghost_gdf = ghost_gdf.to_crs("epsg:27700")
+```
+
+```{python}
+def ghOver90():
+    fig, ax = plt.subplots(figsize=(15, 10))
+    ghost_gdf[ghost_gdf['90_flag'] == 0].plot(ax=ax, marker='o', color='lightblue',alpha=1, 
+                                                 markersize=5, label='Ghost Hotels (<= 90 days)',legend=True)
+    ghost_gdf[ghost_gdf['90_flag'] == 1].plot(ax=ax, marker='o', color='blue',alpha=1, 
+                                                 markersize=5, label='Ghost Hotels ( > 90 days)',legend=True)
+    boros.plot(edgecolor=(0, 0, 0, 0), facecolor='none', alpha=0.3, linewidth=2.5, ax=ax)
+    ax.set_title("Figure 3: The Distribution of Misused STLs in London \n(Over 90 nights)", fontsize = 16) 
+    ax.legend(loc='best')
+    ax.axis('off')
+```
+
+```{python}
+# Counting the count of ghost hotels that occupied over 90 days in each borough
+ghdays_90_df1 = ghdays_90.groupby('neighbourhood_cleansed').size().to_frame('count_of_listings')
+ghdays_90_df1 = ghdays_90_df1.sort_values(by='count_of_listings', ascending=False)
+#print(ghdays_90_df1.head(10))
+
+## result
+# neighbourhood_cleansed  count_of_listings
+#Westminster                          2174
+#Camden                               1043
+#Kensington and Chelsea               1008
+#Tower Hamlets                        1006
+#Southwark                             606
+#Islington                             578
+#Lambeth                               547
+#Hammersmith and Fulham                507
+#Hackney                               507
+#Wandsworth                            421
+```
+
+```{python}
+# Counting the count of ghost hotels that occupied over 90 days for each host
+ghdays_90_df2 = ghdays_90.groupby('host_id').size().to_frame('count_of_listings')
+ghdays_90_df2 = ghdays_90_df2.sort_values(by='count_of_listings', ascending=False)
+#print(ghdays_90_df2.head(10))
+#print(f"There are {len(ghdays_90_df2)} hosts who have ghost hotels that occupied over 90 days.")
+#print(f"Top 3 hosts have {(199+163+100)/len(ghdays_90) *100}% of airbnbs that occupied over 90 days last year.")
+
+## result
+#host_id    count_of_listings
+#1432477                  199
+#269308503                163
+#590452007                100
+#89355192                  97
+#314162972                 88
+#228928499                 83
+#131418248                 55
+#83740964                  54
+#11515631                  47
+#448767922                 44
+```
+
+```{python}
+# Counting the count of ghost hotels that occupied over 90 days for each room type
+count_entire = (ghdays_90['room_type'] == 'Entire home/apt').sum()
+count_private = (ghdays_90['room_type'] == 'Private room').sum()
+count_shared = (ghdays_90['room_type'] == 'Shared room').sum()
+#print("Entire home/apt:", count_entire)
+#print("Private room:", count_private)
+#print("Shared room:", count_shared)
+
+## result
+# Entire home/apt: 8010
+# Private room: 2957
+# Shared room: 22
+```
+
+# Response to Questions
+
+## 1. Who collected the InsideAirbnb data?
+
+::: {.duedate}
+
+The InsideAirbnb data was collected by a team led by Murray Cox with the following individuals' significant contributions [@InsideAirbnb1]. This is part of a mission-driven project that provides data and advocacy regarding Airbnb's impact on residential communities.
+
+Collaborators: Murray Cox, John Morris, Taylor Higgins.
+
+Past collaborators: Alice Corona, Luca Lamonaca, Michael "Ziggy" Mintz.
+
+:::
+
+## 2. Why did they collect the InsideAirbnb data?
+
+::: {.duedate}
+
+@InsideAirbnb1 argued, as a privately owned company, Airbnb currently lacks a mechanism to hold itself accountable for its actions. The public’s ability to see the truth behind Airbnb’s selectively released data is limited.
+
+Thus, @InsideAirbnb1 believes in regularly monitoring and analyzing Airbnb's posted data, working towards a vision where communities are empowered with the data and information necessary to understand, decide, and control the role of renting residential homes to tourists.
+
+:::
+
+## 3. How did they collect it?
+
+::: {.duedate}
+
+Murray Cox has collected data monthly since early 2015 as part of his InsideAirbnb initiative. Tom Slee has collected data starting from late 2013. These two datasets were collected independently [@InsideAirbnb].
+
+Both datasets were assembled using web scraping techniques from Airbnb's website. They first locate all the listings within a city and then visit each listing's page to collect data, including the host ID. The host ID enables the analysis of the number of listings posted by a single host. They analyzed the two datasets by presenting them side by side. The high similarity of the two datasets ensures credibility [@InsideAirbnb].
+
+:::
+
+## 4. How does the method of collection (Q3) impact the completeness and/or accuracy of the InsideAirbnb data? How well does it represent the process it seeks to study, and what wider issues does this raise?
+
+::: {.duedate}
+
+#### Completeness and Accuracy
+
+The InsideAirbnb dataset showed listings that matched Airbnb’s numbers with a margin of error of 3% to 6%, compared to Airbnb's official data release [@InsideAirbnb]. This suggests that the methodology’s accuracy is robust, capturing almost all active listings in the city (at least 95%) [@InsideAirbnb]. Also, this collection process effectively captures the listing of regular dynamics on the Airbnb platform [@InsideAirbnb]. It helps track trends, such as the prevalence of multi-listing hosts, making the results reliable in many studies.
+
+#### Limitation
+
+Firstly, the web scraping approach inherently misses inactive or temporarily hidden properties. Also, web scraping can only capture publicly available data, meaning critical internal metrics like nights stayed and occupancy rates are absent [@GLA2020]. To estimate bookings, many researchers use review data, applying the “San Francisco model,” which assumes that 50% of guests will ultimately leave a review [@assumptions]. This assumption requires further investigation, as review rates vary between 30.5% and 72% across different sources, and there is no definitive way to validate which rate is correct [@assumptions]. Additionally, Airbnb’s calendar data does not classify booked and unavailable nights, which misrepresents the availability metric. Popular listings are often booked but still marked as unavailable, leading to an underrepresentation of their actual availability [@assumptions]. As for location data, the anonymized data collected from the Airbnb website is not precise, with random variations of 0 to 450 feet from the actual address. It limits research on the spatial relationships between listings [@assumptions].
+
+#### Wider Issues
+
+While web scraping is a powerful tool for tracking listings and identifying trends, the completeness and accuracy of the data it produces are still influenced by external factors, such as manipulation by the company and the limitations of publicly available data. Web scraping alone cannot verify the accuracy or completeness of data manipulated by the platform for public relations needs. The reliance on limited data and estimation models raises concerns about the data's accuracy and completeness. Cities and regulators, working with estimates and incomplete information, face challenges in crafting effective regulations. This is particularly problematic when trying to distinguish between professional operators and independent hosts or when assessing the true impact of short-term rentals on housing availability. 
+
+:::
+
+## 5. What ethical considerations does the use of the InsideAirbnb data raise? 
+
+::: {.duedate}
+
+According to InsideAirbnb's statement on their official website, no "private" information is being used. Names, photographs, listings, and review details are all publicly displayed on the Airbnb website [@assumptions]. However, we still encounter the following ethical concerns.
+
+#### Informed Consent 
+Although users implicitly consent to share their data when interacting with Airbnb by agreeing to the platform's terms and conditions [@privacy], there is a distinction between agreeing to share data with Airbnb for operational purposes and using that data for third-party research or public distribution. Many people are unaware of the extent of data collection and how many people can purchase and access these data to capture their housing details [@Crawford2015].
+
+#### Privacy and Data Protection
+The data collected by InsideAirbnb is essentially a snapshot of available listings at specific times, which can still include information on hosts who have deleted their listings for personal reasons. In regions like the European Union, under the General Data Protection Regulation (GDPR), users have the right to request the deletion of their personal data (the "right to be forgotten"). GDPR requires data processors to delete user data as soon as a deletion request is received and prohibits further use of that data [@EU2016]. Thus, privately storing such data through web scraping without informed consent may infringe upon the hosts' privacy rights.
+
+#### Bias and Discrimination 
+Another ethical issue is the geographical/spatial bias in the InsideAirbnb dataset collection process. The data collection predominantly focuses on developed countries and large metropolises, with little attention given to regions in the Global South and smaller cities. This limits the scope of the data to a specific demographic and fails to capture the broader global landscape of Airbnb's influence. As a result, there may be an overemphasis on studies focused on wealthier countries or cities, leading to skewed interpretations and conclusions. This bias overlooks the needs, behaviors, and dynamics of smaller or less developed regions, where Airbnb's impact may differ significantly.
+
+:::
+
+
+## 6. With reference to the InsideAirbnb data (*i.e.* using numbers, figures, maps, and descriptive statistics), what does an analysis of Hosts and the types of properties that they list suggest about the nature of Airbnb lettings in London? 
+
+::: {.duedate}
+
+Upon examining the data, we found that while just 2.9% of all hosts—1,652 in total—have more than five listings, they control a staggering 26,060 listings, accounting for 27%. This reveals that a small number of hosts control a disproportionately large share of listings. Further investigation revealed that many of these listings share highly similar neighborhood overviews and descriptions and are also geographically close to each other.
+
+These features align with a commercial model known as "ghost hotel", which refers to STLs that function as hotels run by professional operators. However, by listing on Airbnb, ghost hotels avoid obligations such as higher taxes and operational costs typically imposed on hotels. The rise of ghost hotels may indicate that Airbnb lettings are increasingly dominated by commercial operations rather than casual or single-property hosts, which poses challenges for regulating STLs. 
+
+In order to identify and quantify the ghost hotels, we combined observed characteristics - multi-listing hosts, high proximity, and similar descriptions- to determine the identification method. First, we filtered out hosts with multiple listings, used NLP to measure the similarity of neighborhood overviews and descriptions, calculated the geographic distance between listings, and identified a ghost hotel if the distance was less than 200 meters and the text similarity exceeded 0.5. Finally, 43,584 potential ghost hotel listings were identified, accounting for approximately 40%. The large proportion of ghost hotels indicates the high level of commercialization of Airbnb lettings in London. 
+
+Figure 1 shows the distribution of the proportion of ghost hotels across London boroughs. The areas with high proportions of ghost hotels are concentrated in central London; for example, the City of London has the highest proportion. The outer boroughs have significantly lower levels of ghost hotels.
+
+::: 
+
+```{python}
+ghProportionPlot()
+```
+
+## 7. Drawing on your previous answers, and supporting your response with evidence (*e.g.* figures, maps, EDA/ESDA, and simple statistical analysis/models drawing on experience from, e.g., CASA0007), how *could* the InsideAirbnb data set be used to inform the regulation of Short-Term Lets (STL) in London? 
+
+::: {.duedate}
+
+#### The regulation of short-term lettings (STLs) in London 
+
+The regulation of STLs in London began with the 1973 Act, which required planning permission to use residential properties as STLs to maintain family housing supply [@England2024]. With the rise of platforms like Airbnb, the 2015 Deregulation Act allowed STLs for up to 90 nights per year without planning permission [@England2024]. In response, Airbnb introduced a 90-night limit in 2017 to automatically suspend bookings for listings exceeding 90 nights [@airbnb1340].
+
+According to @England2024 , the 90-day rule was designed to ensure the thriving development of STLs and alleviate the negative impacts of their misuse by preventing the substantial financial incentives that might tempt more long-term lettings (LTLs) to convert into STLs.
+
+#### Ghost hotels have substantial potential to be converted into LTLs
+
+According to @govuk2024 , properties with six-month or longer rental periods are LTLs. In this study, the listings with 180 or more available days annually are defined as rooms with the potential to be converted into LTLs. Through analysis, we found that 46.6% of listings meet this condition, with ghost hotels accounting for a large portion at 20.8%. Therefore, ghost hotels have the significant potential to be converted into LTLs, making it necessary to prioritize their regulation. The following section evaluates the 90-day rule's effectiveness in curbing ghost hotels.
+
+#### The 90-day rule is likely less effective in preventing the conversion of LTLs into ghost hotels in London
+
+The rule reduces the annual revenue of STLs by limiting the operation length to a maximum of 90 nights within a calendar year. According to @GLA2020 , the maximum annual revenue of short-term lettings under the 90-day limit was £9,810, which is 47% of the yearly revenue of LTLs in 2020. In other words, the annual revenue of LTLs is roughly double that of STLs by 90-day regulation. Therefore, It is assumed that when the maximum annual revenue of ghost hotels is equal to or less than half of the yearly revenue of LTLs, the host will no longer be financially incentivized to convert LTLs into ghost hotels, thereby effectively curbing the conversion of STLs into LTLs. 
+
+Using this formula, we calculated the ratio of the maximum annual revenue of ghost hotels to the yearly revenue of LTLs for each of the thirty-three boroughs in London using this formula. The yearly revenue of LTLs at the borough level is estimated based on the average monthly rent from the Valuation Office Agency's official data. The annual revenue of ghost hotels is estimated using InsideAirbnb data, calculated by multiplying the price per night by 90 nights, representing the maximum potential yearly revenue of LTLs within boroughs.
+
+:::
+
+```{python}
+ghRevenue_ratioPlot()
+```
+
+::: {.duedate}
+
+Under existing limitations, the average annual revenue of ghost hotels is equivalent to 55% of the average yearly revenue of LTLs. Except for Sutton, Harrow, and Waltham Forest, the annual revenue of ghost hotels in all other boroughs exceeds 50% of the annual revenue of LTLs, far surpassing the threshold of 50% that could effectively curb the conversion from short-term rentals to ghost hotels. As shown in Figure 2, the effectiveness of the 90-day rule is highly limited in Kensington and Chelsea and the City of London, where the annual revenues of ghost hotels are equivalent to 67.0% and 79.4% of the revenues of LTLs in these areas, respectively.
+
+The results indicate that the effectiveness of the 90-day rule varies across boroughs due to geographic differences in the revenue of ghost hotels and LTLs. Additionally, the varying rates of change between LTL prices and ghost hotel prices could affect the rule's effectiveness from year to year. Therefore, it is suggested that the day limit be adjusted based on changes in SLTs and LTLs market prices. For example, the day limit could be tightened in areas, where ghost hotels have greater financial incentives.
+
+#### Misuse of STLs remains
+
+Ghost hotels exceeding 90 booked nights are considered misused, which avoid the rule for higher profits. Using the occupancy model used by @GLA2020, which assumes a 50% review rate, the number of booked nights for each listing is based on the number of reviews per month and the minimum number of nights per year. Notably, this model tends to overestimate the occupancy rate of listings [@England2024]. Therefore, the misused listings identified in this study represent potential cases of misuse but not exact cases.
+
+:::
+
+```{python}
+ghOver90()
+```
+
+::: {.duedate}
+
+There are 10,989 cases of misuse. Entire homes or apartments have the highest proportion, accounting for 73% of these. As shown in Figure 3, the misused listings are concentrated in the central part. The top five boroughs with the most misused listings are Westminster, Camden, Kensington and Chelse, and Tower Hamlets. Moreover, most misused listings are offered by the same hosts. The top three hosts with the highest number of misused listings at 4.2% of all misused listings. These three hosts are the agencies providing Airbnb management services. It points out that these agencies are more likely to maximize profits by circumventing the 90-day limit and misusing STLs.
+
+In order to curb the misuse of STLs, it is recommended that the legality of the listings operated by these management companies be reviewed, especially the entire homes and apartments in the five boroughs with the most misused listings. Other effective policies might require Airbnb to impose additional application requirements and regulations on individuals or companies operating commercially, ensuring they meet specific property listing criteria.
+
+:::
+
+## References {.unnumbered}
